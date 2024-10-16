@@ -94,27 +94,9 @@ public class StreamingJob {
         /// Configure SASL/SCRAM authentication fetching secrets dynamically, using Config Providers
         // (This part would be identical for setting up a KafkaSource)
 
-
-        // Set up the Config Providers: S3 and SecretsManager
+        // Fetch SASL credentials from SecretsManager
         builder.setProperty("config.providers", "secretsmanager,s3import");
-        builder.setProperty("config.providers.s3import.class", "com.amazonaws.kafka.config.providers.S3ImportConfigProvider");
         builder.setProperty("config.providers.secretsmanager.class", "com.amazonaws.kafka.config.providers.SecretsManagerConfigProvider");
-
-
-        // Use Config Providers to fetch TrustStore from S3
-        String bucketRegion = sinkProperties.getProperty(S3_BUCKET_REGION_KEY);
-        String truststoreS3Bucket = sinkProperties.getProperty(TRUSTSTORE_S3_BUCKET_KEY);
-        String truststoreS3Path = sinkProperties.getProperty(TRUSTSTORE_S3_PATH_KEY);
-        Preconditions.checkNotNull(bucketRegion, S3_BUCKET_REGION_KEY + " configuration missing");
-        Preconditions.checkNotNull(truststoreS3Bucket, TRUSTSTORE_S3_BUCKET_KEY + " configuration missing");
-        Preconditions.checkNotNull(truststoreS3Path, TRUSTSTORE_S3_PATH_KEY + " configuration missing");
-
-        builder.setProperty("config.providers.s3import.param.region", bucketRegion);
-        builder.setProperty("ssl.truststore.location", "${s3import:" + bucketRegion + ":" + truststoreS3Bucket + "/" + truststoreS3Path + "}");
-        // Assuming the TrustStore is a copy of the default JDK truststore, the password is always the default 'changeit`
-        // If you are using a different TrustStore, you can use an additional SecretsManager secret to store the password
-        // and fetch it dynamically, as done below for the SASL credentials
-        builder.setProperty("ssl.truststore.password", "changeit");
 
         // Set up SASL_TLS authentication, using the credentials
         String secretsManagerSecretName = sinkProperties.getProperty(SASL_CREDENTIALS_SECRET_KEY);
@@ -128,6 +110,27 @@ public class StreamingJob {
         String usernameConfigProvider = "${secretsmanager:" + secretsManagerSecretName + ":" + usernameSecretField + "}";
         String passwordConfigProvider = "${secretsmanager:" + secretsManagerSecretName + ":" + passwordSecretField + "}";
         builder.setProperty("sasl.jaas.config", "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"" + usernameConfigProvider + "\" password=\"" + passwordConfigProvider + "\";");
+
+
+        /// Download custom TrustStore from S3
+        // This is required only if your Kafka cluster uses a self-signed certificate for SSL.
+        // This is not required for MSK that uses server certificates signed by a public CA recognised by standard JVM.
+        // COMMENT OUT THE FOLLOWING BLOCK IF REQUIRED
+
+        // Use Config Providers to fetch TrustStore from S3
+//        builder.setProperty("config.providers.s3import.class", "com.amazonaws.kafka.config.providers.S3ImportConfigProvider");
+//        String bucketRegion = sinkProperties.getProperty(S3_BUCKET_REGION_KEY);
+//        String truststoreS3Bucket = sinkProperties.getProperty(TRUSTSTORE_S3_BUCKET_KEY);
+//        String truststoreS3Path = sinkProperties.getProperty(TRUSTSTORE_S3_PATH_KEY);
+//        Preconditions.checkNotNull(bucketRegion, S3_BUCKET_REGION_KEY + " configuration missing");
+//        Preconditions.checkNotNull(truststoreS3Bucket, TRUSTSTORE_S3_BUCKET_KEY + " configuration missing");
+//        Preconditions.checkNotNull(truststoreS3Path, TRUSTSTORE_S3_PATH_KEY + " configuration missing");
+//        builder.setProperty("config.providers.s3import.param.region", bucketRegion);
+//        builder.setProperty("ssl.truststore.location", "${s3import:" + bucketRegion + ":" + truststoreS3Bucket + "/" + truststoreS3Path + "}");
+        // We assume that the TrustStore uses the default 'changeit` password.
+        // If your TrustStore has a different password, you can use an additional SecretsManager secret to store the password
+        // and fetch it dynamically, as done below for the SASL credentials
+//        builder.setProperty("ssl.truststore.password", "changeit");
 
         return builder.build();
     }

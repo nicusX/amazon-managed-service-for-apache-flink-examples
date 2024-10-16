@@ -11,12 +11,10 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <buildDirectory>${project.basedir}/target</buildDirectory>
-        <jar.finalName>${project.name}-${project.version}</jar.finalName>
         <target.java.version>11</target.java.version>
         <maven.compiler.source>${target.java.version}</maven.compiler.source>
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
-        <flink.version>1.19.1</flink.version>
+        <flink.version>1.20.0</flink.version>
         <kafka.connector.version>3.2.0-1.19</kafka.connector.version>
         <kda.runtime.version>1.2.0</kda.runtime.version>
         <log4j.version>2.17.2</log4j.version>
@@ -101,8 +99,7 @@
     </dependencies>
 
     <build>
-        <directory>${buildDirectory}</directory>
-        <finalName>${jar.finalName}</finalName>
+        <finalName>${project.name}_${flink.version}-${project.version}</finalName>
 
         <plugins>
             <!-- Java Compiler -->

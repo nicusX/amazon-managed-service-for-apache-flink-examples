@@ -1,0 +1,17 @@
+[
+  {
+    "PropertyGroupId": "InputStream0",
+    "PropertyMap": {
+      "stream.arn": "arn:aws:kinesis:us-east-1:261417225323:stream/ExampleInputStream",
+      "aws.region": "us-east-1",
+      "flink.source.init.position": "LATEST"
+    }
+  },
+  {
+    "PropertyGroupId": "OutputStream0",
+    "PropertyMap": {
+      "stream.arn": "arn:aws:kinesis:us-east-1:261417225323:stream/ExampleOutputStream",
+      "aws.region": "us-east-1"
+    }
+  }
+]

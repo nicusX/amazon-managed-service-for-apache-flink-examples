@@ -38,5 +38,6 @@
         <module>SideOutputs</module>
         <module>PrometheusSink</module>
         <module>SQSSink</module>
+        <module>WindowCustomTrigger</module>
     </modules>
 </project>

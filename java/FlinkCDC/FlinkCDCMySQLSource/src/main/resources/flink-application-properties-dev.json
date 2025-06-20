@@ -1,0 +1,21 @@
+[
+  {
+    "PropertyGroupId": "CDCSource",
+    "PropertyMap": {
+      "hostname": "localhost",
+      "port": "3306",
+      "username": "flinkusr",
+      "password": "flinkpw",
+      "database.name": "sales",
+      "table.name": "orders",
+      "server.id": "1000-1064"
+    }
+  },
+  {
+    "PropertyGroupId": "DynamoDBSink",
+    "PropertyMap": {
+      "table.name": "Orders",
+      "aws.region": "us-east-1"
+    }
+  }
+]

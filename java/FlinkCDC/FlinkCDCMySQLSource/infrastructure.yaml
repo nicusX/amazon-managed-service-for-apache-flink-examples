@@ -1,0 +1,176 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for CDC test resources: Aurora MySQL cluster and DynamoDB table'
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC where the Aurora cluster will be deployed
+
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security Group for the Aurora cluster
+
+Resources:
+  # Aurora MySQL Cluster
+  AuroraDBCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DBClusterIdentifier: CDC-test-database
+      Engine: aurora-mysql
+      EngineMode: provisioned
+      EngineVersion: 8.0.mysql_aurora.3.08.2
+      MasterUsername: admin
+      MasterUserPassword: !Join ['', ['{{resolve:secretsmanager:', !Ref AuroraSecret, ':SecretString:password}}' ]]
+      VpcSecurityGroupIds:
+        - !Ref SecurityGroupId
+      EnableHttpEndpoint: true  # Enables RDS Data API
+      DeletionProtection: false
+      StorageEncrypted: true
+
+  AuroraDBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref AuroraDBCluster
+      DBInstanceClass: db.r5.large
+      Engine: aurora-mysql
+      PubliclyAccessible: false
+
+  # Secret for Aurora credentials
+  AuroraSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub 'CDC-test-database-secret'
+      Description: 'Secret for CDC test Aurora MySQL database'
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: 'password'
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\\'
+
+  # IAM Role for Lambda function
+  DatabaseSetupLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: RDSDataAPIAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - rds-data:ExecuteStatement
+                  - rds-data:BatchExecuteStatement
+                  - rds-data:BeginTransaction
+                  - rds-data:CommitTransaction
+                  - rds-data:RollbackTransaction
+                Resource: !Sub 'arn:aws:rds:${AWS::Region}:${AWS::AccountId}:cluster:${AuroraDBCluster}'
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource: !Ref AuroraSecret
+
+  # Lambda function to setup database
+  DatabaseSetupLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-database-setup'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt DatabaseSetupLambdaRole.Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import cfnresponse
+          
+          def lambda_handler(event, context):
+              try:
+                  if event['RequestType'] == 'Delete':
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      return
+                  
+                  rds_client = boto3.client('rds-data')
+                  cluster_arn = event['ResourceProperties']['ClusterArn']
+                  secret_arn = event['ResourceProperties']['SecretArn']
+                  
+                  # SQL commands to execute
+                  sql_commands = [
+                      "CREATE USER 'flinkusr'@'%' IDENTIFIED BY 'flinkpw'",
+                      "GRANT SELECT, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'flinkusr'@'%'",
+                      "FLUSH PRIVILEGES",
+                      "CREATE DATABASE sales",
+                      "USE sales",
+                      """CREATE TABLE orders (
+                        order_id INT PRIMARY KEY,
+                        order_date TIMESTAMP(0),
+                        customer_name VARCHAR(255),
+                        product_id INT,
+                        price DECIMAL(10,5),
+                        order_status BOOLEAN
+                      )""",
+                      """INSERT INTO orders VALUES
+                         (1, '2025-06-16 11:01:00', 'My first customer', 42, 27.35, true),
+                         (2, '2025-06-16 11:03:00', 'Second customer', 43, 13.76, false)"""
+                  ]
+                  
+                  # Execute each SQL command
+                  for sql in sql_commands:
+                      print(f"Executing SQL: {sql}")
+                      response = rds_client.execute_statement(
+                          resourceArn=cluster_arn,
+                          secretArn=secret_arn,
+                          sql=sql
+                      )
+                      print(f"Response: {response}")
+                  
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                  
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {})
+
+  # Custom resource to trigger database setup
+  DatabaseSetupCustomResource:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: AuroraDBInstance
+    Properties:
+      ServiceToken: !GetAtt DatabaseSetupLambda.Arn
+      ClusterArn: !Sub 'arn:aws:rds:${AWS::Region}:${AWS::AccountId}:cluster:${AuroraDBCluster}'
+      SecretArn: !Ref AuroraSecret
+
+  # DynamoDB Table
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Orders
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: order_id
+          AttributeType: N
+      KeySchema:
+        - AttributeName: order_id
+          KeyType: HASH
+
+Outputs:
+  AuroraEndpoint:
+    Description: Aurora Cluster Endpoint
+    Value: !GetAtt AuroraDBCluster.Endpoint.Address
+
+  AuroraSecretARN:
+    Description: ARN of the Aurora Secret in Secrets Manager
+    Value: !Ref AuroraSecret
+
+  DynamoDBTableName:
+    Description: Name of the DynamoDB table
+    Value: !Ref OrdersTable

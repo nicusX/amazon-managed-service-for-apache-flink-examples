@@ -1,0 +1,14 @@
+[
+  {
+    "PropertyGroupId": "CDCSource",
+    "PropertyMap": {
+      "hostname": "localhost",
+      "port": "5432",
+      "username": "flinkusr",
+      "password": "PassW0rd!",
+      "database.name": "mydatabase",
+      "table.name": "public.shipments",
+      "slot.name": "flinkshipments"
+    }
+  }
+]

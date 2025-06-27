@@ -57,7 +57,7 @@ public class FlinkCDCSqlServer2JdbcJob {
         }
 
 
-        // Create CDC source table
+            // Create CDC source table
         Properties cdcSourceProperties = applicationProperties.get("CDCSource");
         tableEnv.executeSql("CREATE TABLE Customers (" +
                 "  CustomerID INT," +

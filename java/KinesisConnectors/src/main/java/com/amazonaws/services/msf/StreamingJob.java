@@ -78,9 +78,9 @@ public class StreamingJob {
         DataStream<Stock> input = env.fromSource(source,
                 WatermarkStrategy.noWatermarks(),
                 "Kinesis source",
-                TypeInformation.of(Stock.class));
+                TypeInformation.of(Stock.class)).uid("kinesis-source");
 
-        input.sinkTo(sink);
+        input.sinkTo(sink).uid("kinesis-sink");
         env.execute("Flink Kinesis Source and Sink examples");
     }
 }

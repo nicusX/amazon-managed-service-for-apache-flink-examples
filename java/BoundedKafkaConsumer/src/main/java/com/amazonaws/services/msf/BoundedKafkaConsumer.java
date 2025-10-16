@@ -12,6 +12,7 @@ import org.apache.flink.formats.json.JsonSerializationSchema;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +48,7 @@ public class BoundedKafkaConsumer {
                 .setBootstrapServers(inputProperties.getProperty("bootstrap.servers"))
                 .setTopics(inputProperties.getProperty("topic"))
                 .setGroupId(inputProperties.getProperty("group.id"))
-                .setStartingOffsets(OffsetsInitializer.earliest())
+                .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
                 .setBounded(OffsetsInitializer.latest())
                 .setValueOnlyDeserializer(new JsonDeserializationSchema<>(StockPrice.class))
                 .setProperties(inputProperties)

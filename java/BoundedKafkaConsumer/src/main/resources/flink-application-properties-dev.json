@@ -1,0 +1,17 @@
+[
+  {
+    "PropertyGroupId": "Input0",
+    "PropertyMap": {
+      "bootstrap.servers": "localhost:9092",
+      "topic": "stock-prices-bounded",
+      "group.id": "bounded-kafka-consumer"
+    }
+  },
+  {
+    "PropertyGroupId": "Output0",
+    "PropertyMap": {
+      "stream.arn": "arn:aws:kinesis:us-east-1:<account-id>:stream/ExampleOutput",
+      "aws.region": "us-east-1"
+    }
+  }
+]
